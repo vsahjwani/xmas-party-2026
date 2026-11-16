@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Open When Solved</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Libre+Franklin:wght@400;500;600;700;800&display=swap" />
+<style>
+  /* ============================================================
+     CONFIG — paste your deployed Apps Script URL between the quotes.
+     Until you do, RSVPs show a reminder instead of saving.
+     ============================================================ */
+  :root {
+    --ground:   #FFFFFF;
+    --panel:    #FFFFFF;
+    --tile:     #EFEFE6;
+    --tile-hi:  #E3E3D8;
+    --line:     #D8D8D2;
+    --ink:      #000000;
+    --muted:    #6B6B6B;
+    --gold:     #000000;
+    --gold-soft:#000000;
+    /* Connections difficulty tiers (easiest → hardest) */
+    --t-yellow: #F9DF6D;
+    --t-green:  #A0C35A;
+    --t-blue:   #B0C4EF;
+    --t-purple: #BA81C5;
+    --selected: #4A4A42;
+    --radius: 6px;
+    --maxw: 580px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Libre Franklin", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 28px 16px 64px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: 100%; max-width: var(--maxw); }
+
+  /* ---------- Header ---------- */
+  header { text-align: center; margin-bottom: 22px; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--gold); font-weight: 600; margin: 0 0 10px;
+  }
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600; font-size: clamp(30px, 8vw, 46px);
+    line-height: 1.02; margin: 0; text-wrap: balance;
+    font-optical-sizing: auto;
+  }
+  h1 em { font-style: italic; color: var(--gold-soft); }
+  .sub {
+    color: var(--muted); font-size: 14px; margin: 12px auto 0;
+    max-width: 42ch; line-height: 1.5;
+  }
+
+  /* ---------- Solved rows ---------- */
+  #solved { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .solved-row {
+    border-radius: var(--radius); padding: 18px 14px; color: #000000;
+    animation: pop .35s ease both; aspect-ratio: auto;
+  }
+  .solved-row .cat {
+    font-weight: 800; font-size: 15px; letter-spacing: 0.03em;
+    text-transform: uppercase; margin: 0;
+  }
+  .solved-row .members {
+    font-weight: 500; font-size: 15px; margin: 4px 0 0; opacity: .85;
+    text-transform: uppercase;
+  }
+  .lv0 { background: var(--t-yellow); }
+  .lv1 { background: var(--t-green); }
+  .lv2 { background: var(--t-blue); }
+  .lv3 { background: var(--t-purple); }
+
+  /* ---------- Grid ---------- */
+  #grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 18px;
+  }
+  .tile {
+    position: relative; aspect-ratio: 1 / 1;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 4px;
+    background: var(--tile); color: var(--ink);
+    border: none; border-radius: var(--radius);
+    font-weight: 700; font-size: clamp(10px, 3.1vw, 15px);
+    letter-spacing: 0.01em; text-transform: uppercase; line-height: 1.05;
+    cursor: pointer; user-select: none;
+    transition: transform .08s ease, background .12s ease, color .12s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tile:hover { background: var(--tile-hi); }
+  .tile:active { transform: scale(.96); }
+  .tile.sel {
+    background: var(--selected); color: #FFFFFF;
+    transform: scale(.97);
+  }
+  .tile:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .tile.shake { animation: shake .4s ease; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)}
+    40%{transform:translateX(5px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
+  }
+  @keyframes pop { from{opacity:0; transform:translateY(6px) scale(.98)} to{opacity:1; transform:none} }
+
+  /* ---------- Mistakes ---------- */
+  .mistakes {
+    display: flex; align-items: center; justify-content: center;
+    gap: 9px; margin-bottom: 18px; color: var(--muted); font-size: 13px;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--ink); transition: background .2s, transform .2s; }
+  .dot.used { background: var(--tile); transform: scale(.82); }
+
+  /* ---------- Controls ---------- */
+  .controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  button.ctrl {
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    padding: 12px 20px; border-radius: 999px; cursor: pointer;
+    background: #FFFFFF; color: var(--ink); border: 1px solid var(--ink);
+    transition: background .15s, opacity .15s;
+  }
+  button.ctrl:hover:not(:disabled) { background: #F4F4EF; }
+  button.ctrl.primary {
+    background: var(--ink); color: #FFFFFF; border-color: var(--ink);
+  }
+  button.ctrl.primary:hover:not(:disabled) { background: #2a2a2a; }
+  button.ctrl.primary:disabled { opacity: .35; cursor: not-allowed; }
+  button.ctrl:disabled { opacity: .35; cursor: not-allowed; }
+  button.ctrl:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .toast {
+    text-align: center; color: var(--ink); font-size: 13px;
+    font-weight: 700; min-height: 20px; margin: 14px 0 0; letter-spacing: .02em;
+  }
+
+  /* ---------- Reveal / RSVP ---------- */
+  #reveal { margin-top: 26px; }
+
+  /* RSVP form */
+  .rsvp { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px 22px; animation: pop .4s ease both; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; font-weight: 700; }
+  .field input {
+    width: 100%; font-family: inherit; font-size: 15px; color: var(--ink);
+    background: #FFFFFF; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 13px; outline: none; transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--ink); }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .seg button {
+    font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+    padding: 13px; border-radius: var(--radius); background: #FFFFFF;
+    color: var(--ink); border: 1px solid var(--ink); transition: all .14s;
+  }
+  .seg button:disabled { opacity: .4; cursor: not-allowed; }
+  .seg button[aria-pressed="true"].yes { background: var(--t-green); border-color: var(--t-green); }
+  .seg button[aria-pressed="true"].no { background: var(--t-purple); border-color: var(--t-purple); }
+  .rsvp .status { text-align: center; font-size: 13px; margin: 14px 0 0; min-height: 18px; font-weight: 700; }
+  .done-card { text-align: center; padding: 6px 0; }
+  .done-card .big {
+    font-family: "Fraunces", Georgia, serif; font-size: 22px; font-weight: 600; margin: 0;
+    color: var(--ink);
+  }
+
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Connections</h1>
+    <p class="sub">Create four groups of four!</p>
+  </header>
+
+  <div id="solved"></div>
+  <div id="grid" aria-label="word grid"></div>
+
+  <div class="mistakes">
+    <span>Mistakes remaining</span>
+    <span class="dots" id="dots"></span>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl" id="shuffle" type="button">Shuffle</button>
+    <button class="ctrl" id="deselect" type="button" disabled>Deselect all</button>
+    <button class="ctrl primary" id="submit" type="button" disabled>Submit</button>
+  </div>
+  <p class="toast" id="toast"></p>
+
+  <div id="reveal" hidden></div>
+</div>
+
+<script>
+  /* =============================================================
+     1) PASTE YOUR APPS SCRIPT URL HERE  (see setup steps)
+     ============================================================= */
+  const RSVP_ENDPOINT = "https://script.google.com/macros/s/AKfycbwFYqO-hv4QitKWLkQUqACnPNtp4CxVPyMotb-etiY2vUKyz9jKuZzH3WiQODogWbMG/exec"
+
+  /* ---- Puzzle data (easiest → hardest / yellow → purple) ---- */
+  const GROUPS = [
+    { level:0, name:"Details",     words:["102 MONALISA","9PM","28TH DEC","PARTY"] },
+    { level:1, name:"What We'll Do",  words:["GAMES","DANCE","EAT","DRINK"] },
+    { level:2, name:"Off Limits",     words:["THROWING UP","LEAVING TO SMOKE","SKIPPING DRESS CODE","LEAVING BEFORE 3AM"] },
+    { level:3, name:"RSVP",           words:["I","WILL","BE","THERE"] },
+  ];
+
+  const MAX_MISTAKES = 4;
+  const lookup = {};
+  GROUPS.forEach(g => g.words.forEach(w => lookup[w] = g.level));
+
+  let deck = [];            // current order of unsolved words
+  let selected = [];        // selected words
+  let solvedLevels = [];    // levels already placed
+  let mistakes = 0;
+  let locked = false;
+
+  const $grid = document.getElementById("grid");
+  const $solved = document.getElementById("solved");
+  const $dots = document.getElementById("dots");
+  const $submit = document.getElementById("submit");
+  const $deselect = document.getElementById("deselect");
+  const $shuffle = document.getElementById("shuffle");
+  const $toast = document.getElementById("toast");
+  const $reveal = document.getElementById("reveal");
+
+  function shuffleArr(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+  function init(){
+    const all = [];
+    GROUPS.forEach(g => g.words.forEach(w => all.push(w)));
+    deck = shuffleArr(all.slice());
+    renderDots();
+    renderGrid();
+  }
+
+  function renderDots(){
+    $dots.innerHTML = "";
+    for(let i=0;i<MAX_MISTAKES;i++){
+      const d = document.createElement("span");
+      d.className = "dot" + (i < mistakes ? " used" : "");
+      $dots.appendChild(d);
+    }
+  }
+
+  function renderGrid(){
+    $grid.innerHTML = "";
+    deck.forEach(word => {
+      const t = document.createElement("button");
+      t.type = "button";
+      t.className = "tile" + (selected.includes(word) ? " sel" : "");
+      t.textContent = word;
+      t.setAttribute("aria-pressed", selected.includes(word));
+      t.addEventListener("click", () => toggle(word));
+      $grid.appendChild(t);
+    });
+    syncControls();
+  }
+
+  function toggle(word){
+    if(locked) return;
+    const i = selected.indexOf(word);
+    if(i >= 0) selected.splice(i,1);
+    else { if(selected.length >= 4) return; selected.push(word); }
+    renderGrid();
+  }
+
+  function syncControls(){
+    $submit.disabled = selected.length !== 4 || locked;
+    $deselect.disabled = selected.length === 0 || locked;
+  }
+
+  function setToast(msg){ $toast.textContent = msg || ""; }
+
+  $deselect.addEventListener("click", () => { selected = []; renderGrid(); setToast(""); });
+
+  $shuffle.addEventListener("click", () => {
+    deck = shuffleArr(deck.slice()); renderGrid();
+  });
+
+  $submit.addEventListener("click", () => {
+    if(selected.length !== 4 || locked) return;
+    const levels = selected.map(w => lookup[w]);
+    const allSame = levels.every(l => l === levels[0]);
+
+    if(allSame){
+      placeGroup(levels[0]);
+    } else {
+      // "one away" nicety
+      const counts = {};
+      levels.forEach(l => counts[l] = (counts[l]||0)+1);
+      const best = Math.max(...Object.values(counts));
+      mistakes++;
+      renderDots();
+      shakeSelected();
+      setToast(best === 3 ? "Just one away." : "Not quite.");
+      if(mistakes >= MAX_MISTAKES){ revealRemaining(); }
+    }
+  });
+
+  function shakeSelected(){
+    [...$grid.children].forEach(t => {
+      if(selected.includes(t.textContent)){
+        t.classList.add("shake");
+        t.addEventListener("animationend", () => t.classList.remove("shake"), { once:true });
+      }
+    });
+  }
+
+  function placeGroup(level){
+    const g = GROUPS.find(x => x.level === level);
+    solvedLevels.push(level);
+    deck = deck.filter(w => !g.words.includes(w));
+    selected = [];
+    addSolvedRow(g);
+    renderGrid();
+    setToast("");
+    if(solvedLevels.length === GROUPS.length){
+      locked = true;
+      syncControls();
+      setTimeout(() => openInvite(true), 500);
+    }
+  }
+
+  function addSolvedRow(g){
+    const row = document.createElement("div");
+    row.className = "solved-row lv" + g.level;
+    row.innerHTML = '<p class="cat">'+g.name+'</p><p class="members">'+g.words.join("  ·  ")+'</p>';
+    $solved.appendChild(row);
+  }
+
+  function revealRemaining(){
+    locked = true;
+    syncControls();
+    setToast("Big L");
+    const remaining = GROUPS.filter(g => !solvedLevels.includes(g.level)).sort((a,b)=>a.level-b.level);
+    let delay = 300;
+    remaining.forEach(g => {
+      setTimeout(() => { addSolvedRow(g); }, delay);
+      delay += 350;
+    });
+    deck = []; renderGrid();
+    setTimeout(() => openInvite(false), delay + 300);
+  }
+
+  /* ---------------- RSVP ---------------- */
+  function openInvite(won){
+    $reveal.hidden = false;
+    $reveal.innerHTML = `
+      <form class="rsvp" id="rsvpForm" autocomplete="off">
+        <div class="field">
+          <label for="name">Your name</label>
+          <input id="name" name="name" type="text" required placeholder="First name" />
+        </div>
+
+        <div class="field">
+          <label>Are you coming?</label>
+          <div class="seg" role="group" aria-label="Coming?">
+            <button type="button" class="yes" id="btnYes" aria-pressed="false" disabled>Yes, I'm in</button>
+            <button type="button" class="no" id="btnNo" aria-pressed="false" disabled>Can't make it</button>
+          </div>
+        </div>
+
+        <p class="status" id="rsvpStatus"></p>
+      </form>
+    `;
+    wireRsvp();
+    $reveal.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function wireRsvp(){
+    const btnYes = document.getElementById("btnYes");
+    const btnNo = document.getElementById("btnNo");
+    const status = document.getElementById("rsvpStatus");
+    const nameEl = document.getElementById("name");
+
+    function refresh(){
+      const has = !!nameEl.value.trim();
+      btnYes.disabled = !has;
+      btnNo.disabled = !has;
+    }
+    nameEl.addEventListener("input", refresh);
+
+    async function send(coming, btn){
+      btnYes.disabled = true; btnNo.disabled = true;
+      btn.setAttribute("aria-pressed","true");
+      status.className = "status";
+      status.textContent = "Sending…";
+
+      const payload = {
+        name: nameEl.value.trim(),
+        coming: coming,
+        solved: true,
+        at: new Date().toISOString()
+      };
+
+      if(!RSVP_ENDPOINT){
+        status.className = "status err";
+        status.textContent = "RSVP isn't connected yet.";
+        refresh();
+        return;
+      }
+
+      try {
+        await fetch(RSVP_ENDPOINT, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+        showThanks(coming);
+      } catch (err) {
+        status.className = "status err";
+        status.textContent = "Couldn't send — try again.";
+        refresh();
+      }
+    }
+
+    btnYes.addEventListener("click", () => send("yes", btnYes));
+    btnNo.addEventListener("click", () => send("no", btnNo));
+  }
+
+  function showThanks(coming){
+    const form = document.getElementById("rsvpForm");
+    form.innerHTML = coming === "yes"
+      ? '<div class="done-card"><p class="big">You\'re on the list.</p></div>'
+      : '<div class="done-card"><p class="big">Noted.</p></div>';
+  }
+
+  init();
+</script>
+</body>
+</html>
